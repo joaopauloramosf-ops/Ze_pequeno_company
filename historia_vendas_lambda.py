@@ -6,6 +6,7 @@ df = pd.read_csv("tabelas_vendas_ZePequeno_LIMPA.csv", encoding="utf-8-sig")
 
 df["Data"] = pd.to_datetime(df["Data"])
 
+#verificando o total de vendas de cada produto ao longo dos anos
 
 total_pacocas = (
     df[df["Produto"].apply(lambda p: p == "Paçoca")]["Valor_Venda"].sum()
@@ -75,11 +76,10 @@ for bar in bars1:
         fontsize=9,
     )
 
-# --- Gráfico de Baixo: PAÇOCAS (Amendoim) ---
 bars2 = ax2.bar(
     vendas_pacocas_ano["Ano"].astype(str),
     vendas_pacocas_ano["Valor_Venda"],
-    color="#DAA520",  # Tom Amarelo / Amendoim
+    color="#DAA520",  
     edgecolor="black",
 )
 ax2.set_title(
@@ -106,77 +106,79 @@ for bar in bars2:
 plt.tight_layout()
 plt.show()
 
+#Fazendo analise de estagnação do modelo de negocio por cada região
 
+import sys
+import warnings
 import numpy as np
 from scipy.optimize import curve_fit
 
-df = df.sort_values("Data")
+
+warnings.filterwarnings("ignore")
+
+
 def von_bertalanffy(t, L_inf, k, t0):
     return L_inf * (1 - np.exp(-k * (t - t0)))
 
 
-# 3. Seleciona AUTOMATICAMENTE as 4 Regiões com Maior Volume de Vendas (R$)
 top_4_regioes = (
-    df.groupby("Região")["Valor_Venda"]
-    .sum()
-    .nlargest(4)  # Pega as 4 maiores
-    .index.tolist()
+    df.groupby("Região")["Valor_Venda"].sum().nlargest(4).index.tolist()
 )
 
-# Criando a grade de subplots (2x2 Facet Wrap)
-fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
+fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=False)
 axes = axes.flatten()
 
-print("=" * 75)
-print("  MODELO DE VON BERTALANFFY POR REGIÃO (TOP 4 MAIORES VENDAS)")
-print("=" * 75)
+
+resultados_prints = []
 
 for i, regiao in enumerate(top_4_regioes):
     ax = axes[i]
     df_reg = df[df["Região"] == regiao].copy()
 
-    # Agrupa por data e gera a série temporal acumulada
-    df_agrup = df_reg.groupby("Data")["Valor_Venda"].sum().reset_index()
-    df_agrup["Acumulado"] = df_agrup["Valor_Venda"].cumsum()
+    
+    df_mensal = (
+        df_reg.set_index("Data")
+        .resample("MS")["Valor_Venda"]
+        .sum()
+        .reset_index()
+    )
+    df_mensal["Acumulado"] = df_mensal["Valor_Venda"].cumsum()
 
-    # Eixo X contínuo (dias a partir da primeira venda)
-    t_min = df_agrup["Data"].min()
-    df_agrup["Dias"] = (df_agrup["Data"] - t_min).dt.days
+    
+    t_min = df_mensal["Data"].min()
+    df_mensal["Dias"] = (df_mensal["Data"] - t_min).dt.days
 
-    X = df_agrup["Dias"].values
-    Y = df_agrup["Acumulado"].values
+    X = df_mensal["Dias"].values
+    Y = df_mensal["Acumulado"].values
 
-    # Chutes iniciais para o ajuste [L_inf, k, t0]
-    chute_inicial = [Y.max() * 1.2, 0.005, 0]
+    max_y = Y.max()
+    chute_inicial = [max_y * 1.1, 0.003, 0]
 
     try:
-        # Ajuste do Modelo de von Bertalanffy
         popt, _ = curve_fit(
             von_bertalanffy,
             X,
             Y,
             p0=chute_inicial,
-            bounds=(0, [np.inf, 1, 365]),
-            maxfev=10000,
+            bounds=(0, [max_y * 3, 0.1, 365]),
+            maxfev=20000,
         )
         L_inf, k, t0 = popt
 
-        # Linha do Modelo
+        
         X_linha = np.linspace(X.min(), X.max(), 100)
         Y_linha = von_bertalanffy(X_linha, *popt)
         datas_linha = t_min + pd.to_timedelta(X_linha, unit="D")
 
-        # Plot dos Dados Reais
+        
         ax.scatter(
-            df_agrup["Data"],
+            df_mensal["Data"],
             Y,
             color="#2b5c8f",
-            alpha=0.6,
-            s=25,
+            alpha=0.7,
             label="Real Acumulado",
+            s=30,
         )
-
-        # Plot da Curva de von Bertalanffy
         ax.plot(
             datas_linha,
             Y_linha,
@@ -186,38 +188,45 @@ for i, regiao in enumerate(top_4_regioes):
             label="von Bertalanffy",
         )
 
-        # String da Fórmula Estimada
         equacao_str = (
-            f"y(t) = {L_inf:,.0f} · [1 - e^({-k:.4f} · (t - {t0:.1f}))]"
+            f"y(t) = {L_inf:,.0f} · [1 - e^(-{k:.4f} · (t - {t0:.1f}))]"
         )
-
-        # Título do Painel com Nome da Região e Equação
         ax.set_title(
-            f"Região: {regiao}\n{equacao_str}", fontsize=10, fontweight="bold"
+            f"Região: {regiao}\n{equacao_str}", fontsize=9, fontweight="bold"
         )
 
-        # Print no terminal para documentação
-        print(f"\n📍 Região: {regiao}")
-        print(f"   • Teto Estimado (L∞): R$ {L_inf:,.2f}")
-        print(f"   • Taxa (k): {k:.4f}")
-        print(f"   • Offset (t0): {t0:.2f} dias")
-        print(f"   • Equação: {equacao_str}")
+        
+        resultados_prints.append(
+            f"📍 Região: {regiao}\n"
+            f"   • Teto Estimado (L∞): R$ {L_inf:,.2f}\n"
+            f"   • Taxa (k): {k:.4f}\n"
+            f"   • Offset (t0): {t0:.1f} dias\n"
+            f"   • Equação: {equacao_str}\n"
+        )
 
     except Exception as e:
-        ax.set_title(
-            f"Região: {regiao}\n(Erro no ajuste do modelo)", fontsize=10
-        )
-        print(f"Erro ao ajustar {regiao}: {e}")
+        ax.set_title(f"Região: {regiao}\n(Erro de ajuste)", fontsize=9)
+        resultados_prints.append(f"❌ Região: {regiao} -> Erro no ajuste: {e}\n")
 
     ax.grid(True, linestyle=":", alpha=0.6)
     ax.tick_params(axis="x", rotation=30)
 
-# Ajustes do Layout
 fig.supxlabel("Data da Venda", fontsize=12)
 fig.supylabel("Vendas Acumuladas (R$)", fontsize=12)
 plt.tight_layout()
 plt.show()
 
+
+print("\n" + "=" * 75, flush=True)
+print(
+    "  PARÂMETROS DO MODELO DE VON BERTALANFFY (TOP 4 REGIONAL)", flush=True
+)
+print("=" * 75 + "\n", flush=True)
+
+for texto in resultados_prints:
+    print(texto, flush=True)
+
+#Verificando a tendencia de compras de produtos por E-commerce vs. Loja Física
 
 import matplotlib.ticker as mtick
 df["Ano_Mes"] = df["Data"].dt.to_period("M")
