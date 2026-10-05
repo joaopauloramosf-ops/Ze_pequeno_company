@@ -33,7 +33,7 @@ O projeto está dividido em 3 principais análises:
 
 3. TECNOLOGIAS E BIBLIOTECAS UTILIZADAS
 --------------------------------------------------------------------------------
-• Linguagem: Python 3.x
+• Linguagem: Python 3.14
 • Manipulação de Dados: Pandas, NumPy
 • Modelagem e Ajuste de Curvas: SciPy (curve_fit)
 • Visualização de Dados: Matplotlib, Seaborn
