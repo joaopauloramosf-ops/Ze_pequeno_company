@@ -226,17 +226,16 @@ print("=" * 75 + "\n", flush=True)
 for texto in resultados_prints:
     print(texto, flush=True)
 
-#Verificando a tendencia de compras de produtos por E-commerce vs. Loja Física
 
 import matplotlib.ticker as mtick
 df["Ano_Mes"] = df["Data"].dt.to_period("M")
 
-# 2. Identifica as TOP 4 Regiões em volume total de vendas
+
 top_4_regioes = (
     df.groupby("Região")["Valor_Venda"].sum().nlargest(4).index.tolist()
 )
 
-# 3. Preparação da figura com Subplots (2x2 Facet Wrap)
+
 fig, axes = plt.subplots(2, 2, figsize=(14, 10), sharex=True, sharey=True)
 axes = axes.flatten()
 
@@ -250,19 +249,16 @@ for i, regiao in enumerate(top_4_regioes):
     ax = axes[i]
     df_reg = df[df["Região"] == regiao].copy()
 
-    # Agrupa por Ano_Mes e Canal
+    
     vendas_canal = (
         df_reg.groupby(["Ano_Mes", "Canal"])["Valor_Venda"]
         .sum()
         .unstack(fill_value=0)
     )
 
-    # Garante que ambos os canais existam na tabela
-    for canal in ["E-commerce", "Loja Física"]:
-        if canal not in vendas_canal.columns:
-            vendas_canal[canal] = 0
 
-    # Calcula a participação % de cada canal no mês
+
+   
     vendas_canal["Total"] = vendas_canal.sum(axis=1)
     vendas_canal["Pct_ECommerce"] = (
         vendas_canal["E-commerce"] / vendas_canal["Total"]
@@ -273,7 +269,7 @@ for i, regiao in enumerate(top_4_regioes):
 
     datas = vendas_canal.index.to_timestamp()
 
-    # Plot das linhas de tendência de cada canal
+    
     ax.plot(
         datas,
         vendas_canal["Pct_ECommerce"],
@@ -292,7 +288,7 @@ for i, regiao in enumerate(top_4_regioes):
         label="Loja Física",
     )
 
-    # Linha de tendência (regressão linear simples) do E-Commerce
+    
     if len(datas) > 1:
         x_numeric = np.arange(len(datas))
         z = np.polyfit(x_numeric, vendas_canal["Pct_ECommerce"], 1)
