@@ -51,8 +51,7 @@ O projeto está dividido em 3 principais análises:
 3. Garanta que o arquivo de dados esteja no diretório do projeto:
    - tabela_vendas_ZePequeno_LIMPA.csv
 
-4. Execute os scripts Python (.py) ou abra os notebooks (.ipynb) no Google Colab.
-
+4. Execute os scripts Python (.py) 
 
 
 
